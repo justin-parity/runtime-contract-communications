@@ -13,6 +13,7 @@ use sc_transaction_pool_api::TransactionPool;
 use sp_api::ProvideRuntimeApi;
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
+use pallet_contracts_rpc::{Contracts, ContractsApi};
 
 /// Full client dependencies.
 pub struct FullDeps<C, P> {
