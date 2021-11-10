@@ -60,19 +60,11 @@ mod rand_extension {
 	use super::RuntimeCallErr;
 
 	/// Defines the storage of our contract.
-	///
-	/// Here we store the random seed fetched from the chain.
 	#[ink(storage)]
-	pub struct RandExtension {
+	pub struct ExampleExtension {
 		/// Stores a single `bool` value on the storage.
 		value: [u8; 32],
 		stored_number: u32,
-	}
-
-	#[ink(event)]
-	pub struct RandomUpdated {
-		#[ink(topic)]
-		new: [u8; 32],
 	}
 
 	#[ink(event)]
@@ -80,7 +72,7 @@ mod rand_extension {
 		num: u32,
 	}
 
-	impl RandExtension {
+	impl ExampleExtension {
 		#[ink(constructor)]
 		pub fn default() -> Self {
 			Self { value: Default::default(), stored_number: Default::default() }
@@ -118,7 +110,7 @@ mod rand_extension {
 		/// We test if the default constructor does its job.
 		#[ink::test]
 		fn default_works() {
-			let rand_extension = RandExtension::default();
+			let rand_extension = ExampleExtension::default();
 			assert_eq!(rand_extension.get(), [0; 32]);
 		}
 
@@ -144,7 +136,7 @@ mod rand_extension {
 				}
 			}
 			ink_env::test::register_chain_extension(MockedExtension);
-			let mut rand_extension = RandExtension::default();
+			let mut rand_extension = ExampleExtension::default();
 			assert_eq!(rand_extension.get(), [0; 32]);
 
 			// when
