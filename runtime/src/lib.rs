@@ -80,7 +80,7 @@ pub type Index = u32;
 pub type Hash = sp_core::H256;
 
 /// Contract extension for `FetchRandom`
-pub struct FetchRandomExtension;
+pub struct MyRandomExtension;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -169,7 +169,7 @@ pub fn native_version() -> NativeVersion {
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
-impl ChainExtension<Runtime> for FetchRandomExtension {
+impl ChainExtension<Runtime> for MyRandomExtension {
     fn call<E: Ext>(
         func_id: u32,
         env: Environment<E, InitState>,
@@ -178,26 +178,18 @@ impl ChainExtension<Runtime> for FetchRandomExtension {
         <E::T as SysConfig>::AccountId:
             UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>,
     {
+		// Match function ids assigned in the contract (e.g. through #[ink(extension = 1)])
         match func_id {
-            1101 => {
-                let mut env = env.buf_in_buf_out();
-                let random_seed = crate::RandomnessCollectiveFlip::random_seed().0;
-                let random_slice = random_seed.encode();
-                trace!(
-                    target: "runtime",
-                    "[ChainExtension]|call|func_id:{:}",
-                    func_id
-                );
-                env.write(&random_slice, false, None).map_err(|_| {
-                    DispatchError::Other("ChainExtension failed to call random")
-                })?;
-            },
-			2 => {
+			1 => {
 				let mut env = env.buf_in_buf_out();
-				let arg1 = env.read_as::<u32>()?;
-				crate::pallet_template::Pallet::<Runtime>::call_from_contract(arg1).unwrap_or_else(|_| {
-					DispatchError::Other("Failed to call pallet extrinsic");
-				});
+				// retrieve passed argument
+				let new_storage_value = env.read_as::<u32>()?;
+
+				crate::pallet_template::Pallet::<Runtime>::store_new_number(new_storage_value)?;
+
+				env.write(&name, false, None).map_err(|_| {
+					DispatchError::Other("ChainExtension failed to call token_name")
+				})?;
             }
             _ => {
                 error!("Called an unregistered `func_id`: {:}", func_id);
@@ -205,10 +197,6 @@ impl ChainExtension<Runtime> for FetchRandomExtension {
             }
         }
         Ok(RetVal::Converging(0))
-    }
-
-    fn enabled() -> bool {
-        true
     }
 }
 
@@ -392,7 +380,7 @@ impl pallet_contracts::Config for Runtime {
 	type ContractDeposit = ContractDeposit;
 	type WeightPrice = pallet_transaction_payment::Pallet<Self>;
 	type WeightInfo = pallet_contracts::weights::SubstrateWeight<Self>;
-	type ChainExtension = FetchRandomExtension;
+	type ChainExtension = MyRandomExtension;
 	type DeletionQueueDepth = DeletionQueueDepth;
 	type DeletionWeightLimit = DeletionWeightLimit;
 	type Schedule = Schedule;

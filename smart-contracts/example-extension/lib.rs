@@ -12,7 +12,7 @@ use ink_lang as ink;
 pub trait FetchRandom {
 	type ErrorCode = RuntimeCallErr;
 
-	#[ink(extension = 2)]
+	#[ink(extension = 1)]
 	fn call_pallet(key: &u8) -> Result<(u32, [u8; 32]), RuntimeCallErr>;
 }
 

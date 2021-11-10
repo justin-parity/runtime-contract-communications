@@ -4046,7 +4046,6 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
- "log",
  "pallet-contracts 4.0.0-dev",
  "parity-scale-codec",
  "scale-info",

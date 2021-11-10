@@ -171,7 +171,6 @@ where
 		match new_value {
 			Some(_) => Ok(ChargedAmount(amount)),
 			None => {
-				info!("in charge(), gas.rs OutOfGas");
 				// panic!("Panic here for debugging.");
 				Err(Error::<T>::OutOfGas.into())
 			},

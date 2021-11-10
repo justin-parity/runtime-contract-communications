@@ -16,12 +16,10 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::inherent::Vec;
-	use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Currency, weights::Weight};
+	use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Currency, weights::Weight, inherent::Vec};
 	use frame_system::pallet_prelude::*;
 	use pallet_contracts::chain_extension::UncheckedFrom;
-
-	use log::info;
+	use pallet_contracts_primitives::ExecReturnValue;
 
 	type BalanceOf<T> = <<T as pallet_contracts::Config>::Currency as Currency<
 		<T as frame_system::Config>::AccountId,
@@ -48,16 +46,13 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		CalledContract(T::AccountId),
-		ContractCallFailed(DispatchError),
+		CalledContract,
 		CalledPalletFromContract(u32)
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		SmartContractCallError,
-		/// Value given by smart contract is already set
 		ValueAlreadyExists
 	}
 
@@ -67,7 +62,7 @@ pub mod pallet {
 		T::AccountId: UncheckedFrom<T::Hash>,
 		T::AccountId: AsRef<[u8]>,
 	{
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]		
 		// An example to demonstrate calling a smart contract from an extrinsic
 		pub fn call_smart_contract(
 			origin: OriginFor<T>,
@@ -75,24 +70,14 @@ pub mod pallet {
 			selector: Vec<u8>,
 			arg: u32,
 		) -> DispatchResult {
-
-			
 			let who = ensure_signed(origin)?;
 			// Amount to transfer
 			let value: BalanceOf<T> = Default::default();
 			// Arbitrary gas limit
-			let gas_limit = 1000;
-
-			// // log values to compare
-			// info!("{:?}", selector); // [122, 20, 161, 130]
-			// info!("{:?}", arg); // 42
-
-			// see https://github.com/paritytech/substrate/blob/a9465729e2c5d2ef8d87ac404da27e5e10adde8a/frame/contracts/src/benchmarking/mod.rs#L2264-L2268
+			let gas_limit = 10000;
 			let data = (selector, arg).encode();
 
-			// info!("{:?}", data); // [16, 122, 20, 161, 130, 42, 0, 0, 0]     
-
-			pallet_contracts::Pallet::<T>::bare_call(
+			let success = pallet_contracts::Pallet::<T>::bare_call(
 				who,
 				dest.clone(),
 				value,
@@ -102,22 +87,37 @@ pub mod pallet {
 			)
 			.result?;
 
-			// do send event
-			// Self::deposit_event(Event::CalledContract(success));
-
+			Self::deposit_event(Event::CalledContract);
 			Ok(())
 		}
 
-		// TODO: Less generic extrinsic for calling flipper
+
+		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		// // A less generic example showing the values required for designating a contract and method
+		// pub fn flip_smart_contract(origin: OriginFor<T>) -> DispatchResult {
+		// 	let who = ensure_signed(origin)?;
+			
+		// 	let dest;
+
+		// 	pallet_contracts::Pallet::<T>::bare_call(
+		// 		who,
+		// 		dest.clone(),
+		// 		value,
+		// 		gas_limit,
+		// 		data,
+		// 		true,
+		// 	)
+		// 	.result?;
+
+		// 	Ok(())
+		// }
 	}
 
 	impl <T: Config> Pallet<T> {
 		// An example pallet function to demonstrate calling from a smart contract
-		pub fn call_from_contract(
+		pub fn store_new_number(
 			val: u32,
 		) -> DispatchResult {
-			info!("in extrinsic received {}", val);
-
 			// Do something with the value
 			ensure!(!(ContractEntry::<T>::get() == val), Error::<T>::ValueAlreadyExists);
 			ContractEntry::<T>::put(val);

@@ -434,7 +434,6 @@ where
 	/// Returns `Err(HostError)` if there is not enough gas.
 	pub fn charge_gas(&mut self, costs: RuntimeCosts) -> Result<ChargedAmount, DispatchError> {
 		let token = costs.token(&self.ext.schedule().host_fn_weights);
-		info!("landed in charge_gas() before calling()!");
 		self.ext.gas_meter().charge(token)
 	}
 
