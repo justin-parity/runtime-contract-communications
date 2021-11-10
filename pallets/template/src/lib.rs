@@ -16,10 +16,9 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Currency, weights::Weight, inherent::Vec};
+	use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Currency, inherent::Vec};
 	use frame_system::pallet_prelude::*;
 	use pallet_contracts::chain_extension::UncheckedFrom;
-	use pallet_contracts_primitives::ExecReturnValue;
 
 	type BalanceOf<T> = <<T as pallet_contracts::Config>::Currency as Currency<
 		<T as frame_system::Config>::AccountId,
@@ -75,9 +74,10 @@ pub mod pallet {
 			let value: BalanceOf<T> = Default::default();
 			// Arbitrary gas limit
 			let gas_limit = 10000;
+			// data argument is expected to be encoded vector of selector + any args
 			let data = (selector, arg).encode();
 
-			let success = pallet_contracts::Pallet::<T>::bare_call(
+			pallet_contracts::Pallet::<T>::bare_call(
 				who,
 				dest.clone(),
 				value,
@@ -111,17 +111,19 @@ pub mod pallet {
 
 		// 	Ok(())
 		// }
-	}
 
-	impl <T: Config> Pallet<T> {
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]		
 		// An example pallet function to demonstrate calling from a smart contract
 		pub fn store_new_number(
+			origin: OriginFor<T>,
 			val: u32,
 		) -> DispatchResult {
+			ensure_signed(origin)?;
 			// Do something with the value
 			ensure!(!(ContractEntry::<T>::get() == val), Error::<T>::ValueAlreadyExists);
 			ContractEntry::<T>::put(val);
 			Self::deposit_event(Event::CalledPalletFromContract(val));
+
 			Ok(())
 		}
 	}

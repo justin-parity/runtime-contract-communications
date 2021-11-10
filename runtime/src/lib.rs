@@ -18,11 +18,14 @@ use sp_runtime::{
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, MultiSignature,
 };
-use frame_system::limits::{BlockLength, BlockWeights};
+use frame_system::{RawOrigin, limits::{BlockLength, BlockWeights}};
+
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
+
+use codec::Encode;
 
 use pallet_contracts::{
 	chain_extension::{
@@ -36,8 +39,6 @@ use pallet_contracts::{
 	},
 	weights::WeightInfo
 };
-
-use codec::Encode;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
@@ -169,12 +170,17 @@ pub fn native_version() -> NativeVersion {
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
-impl ChainExtension<Runtime> for MyRandomExtension {
+impl ChainExtension<Runtime> for MyRandomExtension
+where
+	Runtime: SysConfig + pallet_contracts::Config,
+	<Runtime as SysConfig>::AccountId: UncheckedFrom<<Runtime as SysConfig>::Hash> + AsRef<[u8]>,
+{
     fn call<E: Ext>(
         func_id: u32,
         env: Environment<E, InitState>,
     ) -> Result<RetVal, DispatchError>
     where
+		E: Ext<T = Runtime>,
         <E::T as SysConfig>::AccountId:
             UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>,
     {
@@ -182,13 +188,16 @@ impl ChainExtension<Runtime> for MyRandomExtension {
         match func_id {
 			1 => {
 				let mut env = env.buf_in_buf_out();
-				// retrieve passed argument
-				let new_storage_value = env.read_as::<u32>()?;
+				// retrieve argument that was passed in smart contract invocation
+				let new_storage_value: u32 = env.read_as()?;
+				let caller = env.ext().caller().clone();
+				let result = crate::pallet_template::Pallet::<Runtime>::store_new_number(
+					RawOrigin::Signed(caller).into(),
+					new_storage_value
+				)?;
 
-				crate::pallet_template::Pallet::<Runtime>::store_new_number(new_storage_value)?;
-
-				env.write(&name, false, None).map_err(|_| {
-					DispatchError::Other("ChainExtension failed to call token_name")
+				env.write(&result.encode(), false, None).map_err(|_| {
+					DispatchError::Other("ChainExtension failed to call store_new_number")
 				})?;
             }
             _ => {
