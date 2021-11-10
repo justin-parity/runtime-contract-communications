@@ -16,12 +16,16 @@ mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Currency, inherent::Vec};
+	use frame_support::inherent::Vec;
+	use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Currency, weights::Weight};
 	use frame_system::pallet_prelude::*;
 	use pallet_contracts::chain_extension::UncheckedFrom;
 
-	type BalanceOf<T> =
-		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	use log::info;
+
+	type BalanceOf<T> = <<T as pallet_contracts::Config>::Currency as Currency<
+		<T as frame_system::Config>::AccountId,
+	>>::Balance;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -35,83 +39,90 @@ pub mod pallet {
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/v3/runtime/storage
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn get_value)]
+	pub(super) type ContractEntry<T> = StorageValue<_, u32, ValueQuery>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
-		CalledContract()
+		CalledContract(T::AccountId),
+		ContractCallFailed(DispatchError),
+		CalledPalletFromContract(u32)
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		SmartContractCallError,
+		/// Value given by smart contract is already set
+		ValueAlreadyExists
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
-	impl<T: Config> Pallet<T> 
-		where 
+	impl<T: Config> Pallet<T>
+	where
 		T::AccountId: UncheckedFrom<T::Hash>,
 		T::AccountId: AsRef<[u8]>,
-	 {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
+	{
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		// An example to demonstrate calling a smart contract from an extrinsic
 		pub fn call_smart_contract(
 			origin: OriginFor<T>,
 			dest: T::AccountId,
-			value: BalanceOf<T>,
-			gas_limit: Weight,
-			data: Vec<u8>,
-			debug: bool,
+			selector: Vec<u8>,
+			arg: u32,
 		) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/v3/runtime/origins
+
+			
 			let who = ensure_signed(origin)?;
+			// Amount to transfer
+			let value: BalanceOf<T> = Default::default();
+			// Arbitrary gas limit
+			let gas_limit = 1000;
 
-			pallet_contracts::Pallet::<T>::bare_call(who, dest, value, gas_limit, data, debug);
+			// // log values to compare
+			// info!("{:?}", selector); // [122, 20, 161, 130]
+			// info!("{:?}", arg); // 42
 
-			// TODO: respond with result information
-			Self::deposit_event(Event::CalledContract());
+			// see https://github.com/paritytech/substrate/blob/a9465729e2c5d2ef8d87ac404da27e5e10adde8a/frame/contracts/src/benchmarking/mod.rs#L2264-L2268
+			let data = (selector, arg).encode();
+
+			// info!("{:?}", data); // [16, 122, 20, 161, 130, 42, 0, 0, 0]     
+
+			pallet_contracts::Pallet::<T>::bare_call(
+				who,
+				dest.clone(),
+				value,
+				gas_limit,
+				data,
+				true,
+			)
+			.result?;
+
+			// do send event
+			// Self::deposit_event(Event::CalledContract(success));
+
 			Ok(())
 		}
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+		// TODO: Less generic extrinsic for calling flipper
+	}
 
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue)?,
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
+	impl <T: Config> Pallet<T> {
+		// An example pallet function to demonstrate calling from a smart contract
+		pub fn call_from_contract(
+			val: u32,
+		) -> DispatchResult {
+			info!("in extrinsic received {}", val);
+
+			// Do something with the value
+			ensure!(!(ContractEntry::<T>::get() == val), Error::<T>::ValueAlreadyExists);
+			ContractEntry::<T>::put(val);
+			Self::deposit_event(Event::CalledPalletFromContract(val));
+			Ok(())
 		}
 	}
 }

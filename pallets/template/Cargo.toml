@@ -62,9 +62,13 @@ version = '4.0.0-dev'
 
 [dependencies.pallet-contracts]
 default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-tag = 'monthly-2021-10'
+# git = 'https://github.com/paritytech/substrate.git'
+# tag = 'monthly-2021-10'
+path = '../contracts'
 version = '4.0.0-dev'
+
+[dependencies.log]
+verson = '0.4.14'
 
 [features]
 default = ['std']

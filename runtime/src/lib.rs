@@ -32,7 +32,7 @@ use pallet_contracts::{
 		InitState,
 		RetVal,
 		SysConfig,
-		UncheckedFrom
+		UncheckedFrom,
 	},
 	weights::WeightInfo
 };
@@ -48,7 +48,7 @@ pub use frame_support::{
 		IdentityFee, Weight, DispatchClass
 	},
 	StorageValue,
-	log::{error, trace}
+	log::{info, trace, error}
 };
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
@@ -191,8 +191,14 @@ impl ChainExtension<Runtime> for FetchRandomExtension {
                 env.write(&random_slice, false, None).map_err(|_| {
                     DispatchError::Other("ChainExtension failed to call random")
                 })?;
+            },
+			2 => {
+				let mut env = env.buf_in_buf_out();
+				let arg1 = env.read_as::<u32>()?;
+				crate::pallet_template::Pallet::<Runtime>::call_from_contract(arg1).unwrap_or_else(|_| {
+					DispatchError::Other("Failed to call pallet extrinsic");
+				});
             }
-
             _ => {
                 error!("Called an unregistered `func_id`: {:}", func_id);
                 return Err(DispatchError::Other("Unimplemented func_id"))

@@ -9,5 +9,6 @@ members = [
 ]
 
 exclude = [
-    'contracts/example-random-extension'
+    'smart-contracts/example-extension',
+    'smart-contracts/flipper'
 ]
