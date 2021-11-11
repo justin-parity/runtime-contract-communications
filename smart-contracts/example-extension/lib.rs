@@ -3,17 +3,13 @@
 use ink_env::Environment;
 use ink_lang as ink;
 
-/// This is an example of how an ink! contract may call the Substrate
-/// runtime function `RandomnessCollectiveFlip::random_seed`. See the
-/// file `runtime/chain-extension-example.rs` for that implementation.
-///
-/// Here we define the operations to interact with the Substrate runtime.
 #[ink::chain_extension]
-pub trait FetchRandom {
+pub trait MyExtension {
 	type ErrorCode = RuntimeCallErr;
 
+	// Specify the function id. We will `match` on this in the runtime to map this to some runtime function
 	#[ink(extension = 1)]
-	fn call_pallet(key: &u8) -> Result<(u32, [u8; 32]), RuntimeCallErr>;
+	fn send(key: &[u8; 32]) -> Result<([u8; 32]), RuntimeCallErr>;
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -52,7 +48,7 @@ impl Environment for CustomEnvironment {
 	type Timestamp = <ink_env::DefaultEnvironment as Environment>::Timestamp;
 	type RentFraction = <ink_env::DefaultEnvironment as Environment>::RentFraction;
 
-	type ChainExtension = FetchRandom;
+	type ChainExtension = MyExtension;
 }
 
 #[ink::contract(env = crate::CustomEnvironment)]
@@ -62,41 +58,53 @@ mod rand_extension {
 	/// Defines the storage of our contract.
 	#[ink(storage)]
 	pub struct ExampleExtension {
-		/// Stores a single `bool` value on the storage.
-		value: [u8; 32],
+		// an arbitrary boolean, to demonstrate toggling
+		some_bool: bool,
 		stored_number: u32,
 	}
 
 	#[ink(event)]
-	pub struct NumUpdated {
-		num: u32,
+	pub struct UpdatedNum {
+		result: u32,
+	}
+
+	#[ink(event)]
+	pub struct UpdatedBool {
+		result: bool,
 	}
 
 	impl ExampleExtension {
 		#[ink(constructor)]
 		pub fn default() -> Self {
-			Self { value: Default::default(), stored_number: Default::default() }
+			Self { some_bool: Default::default(), stored_number: Default::default() }
 		}
 
 		/// An example smart contract function demonstrating interactions originating in a custom pallet
 		#[ink(message)]
 		pub fn call_from_pallet(&mut self, value: u32) -> Result<(), RuntimeCallErr> {
 			self.stored_number = value;
-			self.env().emit_event(NumUpdated { num: value });
+			self.env().emit_event(UpdatedNum { result: value });
+			Ok(())
+		}
+
+		#[ink(message, selector = 0xABCDE)]
+		pub fn toggle_bool(&mut self) -> Result<(), RuntimeCallErr> {
+			self.some_bool = !self.some_bool;
+			self.env().emit_event(UpdatedBool { result: self.some_bool });
 			Ok(())
 		}
 
 		/// Update a value given by argument
 		#[ink(message)]
-		pub fn send_to_pallet(&mut self, value: u8) -> Result<(),RuntimeCallErr> {
-			self.env().extension().call_pallet(&value)?;
+		pub fn send_to_pallet(&mut self, value: [u8; 32]) -> Result<(), RuntimeCallErr> {
+			self.env().extension().send(&value)?;
 			Ok(())
 		}
 
-		/// Simply returns the current value.
+		/// Simply returns the current boolean state.
 		#[ink(message)]
-		pub fn get(&self) -> [u8; 32] {
-			self.value
+		pub fn get(&self) -> bool {
+			self.some_bool
 		}
 	}
 

@@ -49,7 +49,8 @@ pub use frame_support::{
 		IdentityFee, Weight, DispatchClass
 	},
 	StorageValue,
-	log::{info, trace, error}
+	log::{info, trace, error},
+	BoundedVec
 };
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
@@ -189,13 +190,12 @@ where
 			1 => {
 				let mut env = env.buf_in_buf_out();
 				// retrieve argument that was passed in smart contract invocation
-				let new_storage_value: u32 = env.read_as()?;
+				let new_storage_value: [u8; 32] = env.read_as()?;
 				let caller = env.ext().caller().clone();
-				let result = crate::pallet_template::Pallet::<Runtime>::store_new_number(
+				let result = crate::pallet_template::Pallet::<Runtime>::insert_number(
 					RawOrigin::Signed(caller).into(),
 					new_storage_value
 				)?;
-
 				env.write(&result.encode(), false, None).map_err(|_| {
 					DispatchError::Other("ChainExtension failed to call store_new_number")
 				})?;

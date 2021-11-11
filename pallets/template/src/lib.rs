@@ -32,13 +32,15 @@ pub mod pallet {
 		type Currency: Currency<Self::AccountId>;
 	}
 
+	const MAX_LENGTH:usize = 50;
+
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
 	#[pallet::storage]
-	#[pallet::getter(fn get_value)]
-	pub(super) type ContractEntry<T> = StorageValue<_, u32, ValueQuery>;
+	#[pallet::getter(fn get_items)]
+	pub(super) type ContractEntry<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, Vec<u8>, ValueQuery>;
 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events
@@ -46,13 +48,14 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		CalledContract,
-		CalledPalletFromContract(u32)
+		CalledPalletFromContract(Vec<u8>)
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		ValueAlreadyExists
+		ValueAlreadyExists,
+		NewValueTooLarge
 	}
 
 	#[pallet::call]
@@ -66,17 +69,18 @@ pub mod pallet {
 		pub fn call_smart_contract(
 			origin: OriginFor<T>,
 			dest: T::AccountId,
+			// selector as given in the metadata.json file of the compiled contract
 			selector: Vec<u8>,
 			arg: u32,
+			#[pallet::compact] gas_limit: Weight,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			ensure!(selector.len() < MAX_LENGTH, Error::<T>::NewValueTooLarge);
 			// Amount to transfer
 			let value: BalanceOf<T> = Default::default();
-			// Arbitrary gas limit
-			let gas_limit = 10000;
+
 			// data argument is expected to be encoded vector of selector + any args
 			let data = (selector, arg).encode();
-
 			pallet_contracts::Pallet::<T>::bare_call(
 				who,
 				dest.clone(),
@@ -91,39 +95,37 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		// A less generic example, demonstrating the selector. Invokes a smart contract method that toggles a boolean in storage
+		pub fn flip_smart_contract(origin: OriginFor<T>, dest: T::AccountId) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let to_transfer: BalanceOf<T> = Default::default();
+			let gas_limit = 10000;
+			let selector = 0x000abcde;
+			pallet_contracts::Pallet::<T>::bare_call(
+				who,
+				dest.clone(),
+				to_transfer,
+				gas_limit,
+				[selector].encode(),
+				true,
+			)
+			.result?;
 
-		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		// // A less generic example showing the values required for designating a contract and method
-		// pub fn flip_smart_contract(origin: OriginFor<T>) -> DispatchResult {
-		// 	let who = ensure_signed(origin)?;
-			
-		// 	let dest;
-
-		// 	pallet_contracts::Pallet::<T>::bare_call(
-		// 		who,
-		// 		dest.clone(),
-		// 		value,
-		// 		gas_limit,
-		// 		data,
-		// 		true,
-		// 	)
-		// 	.result?;
-
-		// 	Ok(())
-		// }
+			Ok(())
+		}
 
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]		
-		// An example pallet function to demonstrate calling from a smart contract
-		pub fn store_new_number(
+		// An example extrinsic to demonstrate calling from a smart contract
+		pub fn insert_number(
 			origin: OriginFor<T>,
-			val: u32,
+			// val: BoundedVec<u8, T::MaxLength>,
+			val: [u8; 32],
 		) -> DispatchResult {
-			ensure_signed(origin)?;
+			let who = ensure_signed(origin)?;
 			// Do something with the value
-			ensure!(!(ContractEntry::<T>::get() == val), Error::<T>::ValueAlreadyExists);
-			ContractEntry::<T>::put(val);
-			Self::deposit_event(Event::CalledPalletFromContract(val));
-
+			ContractEntry::<T>::insert(who, val.to_vec());
+			Self::deposit_event(Event::CalledPalletFromContract(val.to_vec()));
 			Ok(())
 		}
 	}
