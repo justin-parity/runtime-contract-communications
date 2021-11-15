@@ -2,14 +2,16 @@
 
 use ink_env::Environment;
 use ink_lang as ink;
+use ink_env::AccountId;
 
 #[ink::chain_extension]
 pub trait MyExtension {
 	type ErrorCode = RuntimeCallErr;
-
-	// Specify the function id. We will `match` on this in the runtime to map this to some runtime function
+	// Specify the function id. We will `match` on this in the runtime to map this to some custom pallet extrinsic
 	#[ink(extension = 1)]
-	fn send(key: &[u8; 32]) -> Result<([u8; 32]), RuntimeCallErr>;
+	fn do_store_in_map(key: u32) -> Result<(u32), RuntimeCallErr>;
+	#[ink(extension = 2)]
+	fn do_send_to_transfer(value: u32, recipient: AccountId) -> Result<(u32), RuntimeCallErr>;
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -58,8 +60,6 @@ mod rand_extension {
 	/// Defines the storage of our contract.
 	#[ink(storage)]
 	pub struct ExampleExtension {
-		// an arbitrary boolean, to demonstrate toggling
-		some_bool: bool,
 		stored_number: u32,
 	}
 
@@ -68,43 +68,44 @@ mod rand_extension {
 		result: u32,
 	}
 
-	#[ink(event)]
-	pub struct UpdatedBool {
-		result: bool,
-	}
-
 	impl ExampleExtension {
 		#[ink(constructor)]
 		pub fn default() -> Self {
-			Self { some_bool: Default::default(), stored_number: Default::default() }
+			Self { stored_number: Default::default() }
 		}
 
-		/// An example smart contract function demonstrating interactions originating in a custom pallet
+		/// A simple example function meant to demonstrate calling a smart contract with an argument from a custom pallet
 		#[ink(message)]
-		pub fn call_from_pallet(&mut self, value: u32) -> Result<(), RuntimeCallErr> {
+		pub fn set_value(&mut self, value: u32) -> Result<(), RuntimeCallErr> {
 			self.stored_number = value;
 			self.env().emit_event(UpdatedNum { result: value });
 			Ok(())
 		}
 
+		/// Increment the stored value by some addend. Specify a selector to make it easier to target this function from the extrinsic
 		#[ink(message, selector = 0xABCDE)]
-		pub fn toggle_bool(&mut self) -> Result<(), RuntimeCallErr> {
-			self.some_bool = !self.some_bool;
-			self.env().emit_event(UpdatedBool { result: self.some_bool });
+		pub fn add_to_value(&mut self, value: u32) -> Result<(), RuntimeCallErr> {
+			self.stored_number += value;
+			self.env().emit_event(UpdatedNum { result: self.stored_number });
 			Ok(())
 		}
 
-		/// Update a value given by argument
+		/// Receive the value and pass along to our extended custom pallet extrinsic
 		#[ink(message)]
-		pub fn send_to_pallet(&mut self, value: [u8; 32]) -> Result<(), RuntimeCallErr> {
-			self.env().extension().send(&value)?;
+		pub fn store_in_map(&mut self, value: u32) -> Result<(), RuntimeCallErr> {
+			self.env().extension().do_store_in_map(value)?;
 			Ok(())
 		}
 
-		/// Simply returns the current boolean state.
+		// Receive the value and pass to our extended transfer function
 		#[ink(message)]
-		pub fn get(&self) -> bool {
-			self.some_bool
+		pub fn send_to_transfer(
+			&mut self,
+			amount: u32,
+			recipient: AccountId,
+		) -> Result<(), RuntimeCallErr> {
+			self.env().extension().do_send_to_transfer(amount, recipient)?;
+			Ok(())
 		}
 	}
 
