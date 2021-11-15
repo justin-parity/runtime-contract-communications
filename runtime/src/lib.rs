@@ -6,6 +6,8 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+// use frame_support::dispatch::{DispatchErrorWithPostInfo, DispatchResultWithPostInfo};
+use frame_system::{RawOrigin, limits::{BlockLength, BlockWeights}};
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
@@ -16,48 +18,41 @@ use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
+	ApplyExtrinsicResult, MultiSignature
 };
-use frame_system::{RawOrigin, limits::{BlockLength, BlockWeights}};
 
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
-use codec::Encode;
+use codec::{Decode, Encode, MaxEncodedLen, WrapperTypeEncode};
 
 use pallet_contracts::{
 	chain_extension::{
-		ChainExtension,
-		Environment,
-		Ext,
-		InitState,
-		RetVal,
-		SysConfig,
-		UncheckedFrom,
+		ChainExtension, Environment, Ext, InitState, RetVal, SysConfig, UncheckedFrom,
 	},
-	weights::WeightInfo
+	weights::WeightInfo,
 };
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
-	construct_runtime, parameter_types,
+	construct_runtime,
+	log::{error, info, trace},
+	parameter_types,
 	traits::{KeyOwnerProofSystem, Randomness, StorageInfo},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
-		IdentityFee, Weight, DispatchClass
+		DispatchClass, IdentityFee, Weight,
 	},
-	StorageValue,
-	log::{info, trace, error},
-	BoundedVec
+	BoundedVec, StorageValue,
 };
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::CurrencyAdapter;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-pub use sp_runtime::{Perbill, Permill, DispatchError};
+pub use sp_runtime::{DispatchError, Perbill, Permill};
 
 /// Import the template pallet.
 pub use pallet_template;
@@ -171,42 +166,61 @@ pub fn native_version() -> NativeVersion {
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
+#[derive(Debug, PartialEq, Encode, Decode, MaxEncodedLen)]
+
+struct TransferDetails<TransferAmount, Recipient> {
+	transfer_amount: TransferAmount,
+	recipient: Recipient
+}
+
 impl ChainExtension<Runtime> for MyRandomExtension
 where
 	Runtime: SysConfig + pallet_contracts::Config,
 	<Runtime as SysConfig>::AccountId: UncheckedFrom<<Runtime as SysConfig>::Hash> + AsRef<[u8]>,
 {
-    fn call<E: Ext>(
-        func_id: u32,
-        env: Environment<E, InitState>,
-    ) -> Result<RetVal, DispatchError>
-    where
+	fn call<E: Ext>(func_id: u32, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
+	where
 		E: Ext<T = Runtime>,
-        <E::T as SysConfig>::AccountId:
-            UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>,
-    {
+		<E::T as SysConfig>::AccountId: UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>,
+	{
 		// Match function ids assigned in the contract (e.g. through #[ink(extension = 1)])
-        match func_id {
+		match func_id {
+			// do_store_in_map brings us here
 			1 => {
 				let mut env = env.buf_in_buf_out();
 				// retrieve argument that was passed in smart contract invocation
-				let new_storage_value: [u8; 32] = env.read_as()?;
+				let value: u32 = env.read_as()?;
 				let caller = env.ext().caller().clone();
 				let result = crate::pallet_template::Pallet::<Runtime>::insert_number(
 					RawOrigin::Signed(caller).into(),
-					new_storage_value
+					value,
 				)?;
 				env.write(&result.encode(), false, None).map_err(|_| {
 					DispatchError::Other("ChainExtension failed to call store_new_number")
 				})?;
-            }
-            _ => {
-                error!("Called an unregistered `func_id`: {:}", func_id);
-                return Err(DispatchError::Other("Unimplemented func_id"))
-            }
-        }
-        Ok(RetVal::Converging(0))
-    }
+			}
+			// do_send_to_transfer brings us here
+			2 => {
+				let mut env = env.buf_in_buf_out();
+				// let (transfer_amount, recipient): (u32, AccountId) = env.read_as()?;
+				let transfer_details: TransferDetails<u32, AccountId> =
+					env.read_as()?;
+				let caller = env.ext().caller().clone();
+				let recipient_account = sp_runtime::MultiAddress::Id(transfer_details.recipient);
+
+				pallet_balances::Pallet::<Runtime>::transfer(
+					RawOrigin::Signed(caller).into(),
+					recipient_account,
+					transfer_details.transfer_amount.into(),
+				)?;
+			}
+			_ => {
+				error!("Called an unregistered `func_id`: {:}", func_id);
+				return Err(DispatchError::Other("Unimplemented func_id"));
+			}
+		}
+		Ok(RetVal::Converging(0))
+	}
 }
 
 parameter_types! {
@@ -396,7 +410,6 @@ impl pallet_contracts::Config for Runtime {
 	type CallStack = [pallet_contracts::Frame<Self>; 31];
 }
 
-
 parameter_types! {
 	pub const TransactionByteFee: Balance = 1;
 }
@@ -414,8 +427,7 @@ impl pallet_sudo::Config for Runtime {
 }
 
 /// Configure the pallet-template in pallets/template.
-impl pallet_template::Config for Runtime 
- {
+impl pallet_template::Config for Runtime {
 	type Event = Event;
 	type Currency = Balances;
 }
