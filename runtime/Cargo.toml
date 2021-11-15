@@ -197,7 +197,8 @@ version = '4.0.0-dev'
 
 [dependencies.pallet-contracts]
 default-features = false
-path = '../pallets/contracts'
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-10'
 version = '4.0.0-dev'
 
 [dependencies.pallet-contracts-rpc-runtime-api]
@@ -249,4 +250,10 @@ std = [
     'pallet-contracts/std',
     'pallet-contracts-primitives/std',
     'pallet-contracts-rpc-runtime-api/std'
+]
+
+# Make contract callable functions marked as __unstable__ available. Do not enable
+# on live chains as those are subject to change.
+contracts-unstable-interface = [
+	"pallet-contracts/unstable-interface"
 ]

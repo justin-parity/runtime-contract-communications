@@ -60,10 +60,38 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-10'
 version = '4.0.0-dev'
 
+[dev-dependencies.pallet-balances]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-10'
+version = '4.0.0-dev'
+
+[dev-dependencies.pallet-timestamp]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-10'
+version = '4.0.0-dev'
+
+[dev-dependencies.pallet-randomness-collective-flip]
+version = "4.0.0-dev"
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-10'
+
+
+[dev-dependencies.pallet-utility]
+version = "4.0.0-dev"
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-10'
+
+
 [dependencies.pallet-contracts]
 default-features = false
-path = '../contracts'
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-10'
 version = '4.0.0-dev'
+
+[dependencies.log]
+version = '0.4.14'
 
 [features]
 default = ['std']
