@@ -66,6 +66,12 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-10'
 version = '4.0.0-dev'
 
+[dev-dependencies.sp-std]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-10'
+version = '4.0.0-dev'
+
 [dev-dependencies.pallet-timestamp]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -77,12 +83,15 @@ version = "4.0.0-dev"
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-10'
 
-
 [dev-dependencies.pallet-utility]
 version = "4.0.0-dev"
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-10'
 
+[dev-dependencies.pallet-transaction-payment]
+version = "4.0.0-dev"
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-10'
 
 [dependencies.pallet-contracts]
 default-features = false

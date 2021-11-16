@@ -76,8 +76,7 @@ pub type Index = u32;
 /// A hash of some data used by the chain.
 pub type Hash = sp_core::H256;
 
-/// Contract extension for `FetchRandom`
-pub struct MyRandomExtension;
+pub struct MyExampleExtension;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -173,7 +172,7 @@ struct TransferDetails<TransferAmount, Recipient> {
 	recipient: Recipient
 }
 
-impl ChainExtension<Runtime> for MyRandomExtension
+impl ChainExtension<Runtime> for MyExampleExtension
 where
 	Runtime: SysConfig + pallet_contracts::Config,
 	<Runtime as SysConfig>::AccountId: UncheckedFrom<<Runtime as SysConfig>::Hash> + AsRef<[u8]>,
@@ -185,7 +184,7 @@ where
 	{
 		// Match function ids assigned in the contract (e.g. through #[ink(extension = 1)])
 		match func_id {
-			// do_store_in_map brings us here
+			// do_store_in_map
 			1 => {
 				let mut env = env.buf_in_buf_out();
 				// retrieve argument that was passed in smart contract invocation
@@ -199,9 +198,10 @@ where
 					DispatchError::Other("ChainExtension failed to call store_new_number")
 				})?;
 			}
-			// do_send_to_transfer brings us here
+			// do_send_to_transfer
 			2 => {
 				let mut env = env.buf_in_buf_out();
+				// Retrieve arguments
 				// let (transfer_amount, recipient): (u32, AccountId) = env.read_as()?;
 				let transfer_details: TransferDetails<u32, AccountId> =
 					env.read_as()?;
@@ -212,7 +212,7 @@ where
 					RawOrigin::Signed(caller).into(),
 					recipient_account,
 					transfer_details.transfer_amount.into(),
-				)?;
+				).map_err(|_| DispatchError::Other("ChainExtension failed to call transfer"));
 			}
 			_ => {
 				error!("Called an unregistered `func_id`: {:}", func_id);
@@ -403,7 +403,7 @@ impl pallet_contracts::Config for Runtime {
 	type ContractDeposit = ContractDeposit;
 	type WeightPrice = pallet_transaction_payment::Pallet<Self>;
 	type WeightInfo = pallet_contracts::weights::SubstrateWeight<Self>;
-	type ChainExtension = MyRandomExtension;
+	type ChainExtension = MyExampleExtension;
 	type DeletionQueueDepth = DeletionQueueDepth;
 	type DeletionWeightLimit = DeletionWeightLimit;
 	type Schedule = Schedule;

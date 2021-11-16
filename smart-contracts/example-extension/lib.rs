@@ -82,14 +82,6 @@ mod rand_extension {
 			Ok(())
 		}
 
-		/// Increment the stored value by some addend. Specify a selector to make it easier to target this function from the extrinsic
-		#[ink(message, selector = 0xABCDE)]
-		pub fn add_to_value(&mut self, value: u32) -> Result<(), RuntimeCallErr> {
-			self.stored_number += value;
-			self.env().emit_event(UpdatedNum { result: self.stored_number });
-			Ok(())
-		}
-
 		/// Receive the value and pass along to our extended custom pallet extrinsic
 		#[ink(message)]
 		pub fn store_in_map(&mut self, value: u32) -> Result<(), RuntimeCallErr> {

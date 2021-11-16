@@ -59,7 +59,7 @@ pub mod pallet {
 	#[pallet::error]
 	pub enum Error<T> {
 		ValueAlreadyExists,
-		NewValueTooLarge,
+		ArgumentTooLarge,
 	}
 
 	#[pallet::call]
@@ -80,13 +80,9 @@ pub mod pallet {
 			#[pallet::compact] gas_limit: Weight,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			ensure!(selector.len() < MAX_LENGTH, Error::<T>::NewValueTooLarge);
+			ensure!(selector.len() < MAX_LENGTH, Error::<T>::ArgumentTooLarge);
 			// Amount to transfer
 			let value: BalanceOf<T> = Default::default();
-
-			info!("the selector: {:?}", selector);
-			info!("the arg: {:?}", arg);
-
 			let mut arg_enc: Vec<u8> = arg.encode();
 			let mut data = Vec::new();
 			data.append(&mut selector);
@@ -106,28 +102,9 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		// A less generic example, demonstrating the selector. Invokes a smart contract method that toggles a boolean in storage
-		pub fn flip_smart_contract(origin: OriginFor<T>, dest: T::AccountId) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			let to_transfer: BalanceOf<T> = Default::default();
-			let gas_limit = 10000000000;
-			let selector = 0x000abcde;
-			pallet_contracts::Pallet::<T>::bare_call(
-				who,
-				dest.clone(),
-				to_transfer,
-				gas_limit,
-				[selector].encode(),
-				true,
-			)
-			.result?;
-
-			Ok(())
-		}
 
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		// An extrinsic we'll use demonstrate a call from a smart contract
+		// An extrinsic for demonstrating calls originating from a smart contract
 		pub fn insert_number(origin: OriginFor<T>, val: u32) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			// Do something with the value
